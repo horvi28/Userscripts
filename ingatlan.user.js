@@ -109,6 +109,104 @@ function drainGeocodeQueue() {
     });
 }
 
-console.log(collectListings());
-console.log(geocodeAddress("Budapest I. kerület, Logodi utca"))
-console.log(geocodeAddress("Budapest IX. kerület, Viola utca 42."))
+
+// Export to GeoJSON
+// -----------------
+
+async function exportGeoJSON() {
+    const listings = collectListings();
+    if (!listings.length) {
+        console.warn('ingatlanMap: no listings found to export');
+        return;
+    }
+
+    console.log(`ingatlanMap: geocoding ${listings.length} listings for export...`);
+    const features = [];
+    for (const listing of listings) {
+        try {
+            const coords = await geocodeAddress(listing.address);
+            if (coords) {
+                features.push({
+                    type: 'Feature',
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [coords.lon, coords.lat], // GeoJSON order: [lon, lat]
+                    },
+                    properties: {
+                        listingId: listing.listingId,
+                        address:   listing.address,
+                        price:     listing.price,
+                        size:      listing.size,
+                        href:      listing.href,
+                    },
+                });
+            }
+        } catch (e) {
+            console.warn('ingatlanMap: geocode failed for', listing.address, e);
+        }
+    }
+
+    const geojson = JSON.stringify({ type: 'FeatureCollection', features }, null, 2);
+    const blob = new Blob([geojson], { type: 'application/geo+json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ingatlan-favorites.geojson';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    console.log(`ingatlanMap: exported ${features.length}/${listings.length} listings to GeoJSON`);
+}
+
+function injectExportUI() {
+    const firstCard = document.querySelector('.saved-listing-item');
+    if (!firstCard) return;
+    const listContainer = firstCard.parentElement;
+
+    GM_addStyle(`
+        #fav-map-export {
+            display: inline-block;
+            margin-bottom: 0.75rem;
+            margin-left: 0.5rem;
+            padding: 0.5rem 1.25rem;
+            background: #fff;
+            color: #495057;
+            border: 1px solid #adb5bd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #fav-map-export:hover { background: #f8f9fa; }
+    `);
+
+    const exportButton = document.createElement('button');
+    exportButton.id = 'fav-map-export';
+    exportButton.textContent = 'Export GeoJSON';
+    exportButton.addEventListener('click', () => {
+        exportButton.textContent = 'Export...';
+        exportButton.disabled = true;
+        exportGeoJSON().finally(() => {
+            exportButton.textContent = 'Export GeoJSON';
+            exportButton.disabled = false;
+        });
+    });
+    listContainer.parentElement.insertBefore(exportButton, listContainer);
+}
+
+// Wait for the Next.js SPA to render listing cards before injecting UI
+function waitForListings(callback, maxWaitMs = 8000) {
+    const start = Date.now();
+    const interval = setInterval(() => {
+        if (document.querySelector('.saved-listing-item')) {
+            clearInterval(interval);
+            callback();
+        } else if (Date.now() - start > maxWaitMs) {
+            clearInterval(interval);
+            console.warn('ingatlanMap: timed out waiting for listing cards');
+        }
+    }, 300);
+}
+
+waitForListings(injectExportUI);
