@@ -27,7 +27,20 @@ function collectListings() {
         const listingId = element.getAttribute('data-saved-listings-page--item-listing-id-value');
         const address = element.querySelector('span.d-block.fs-7.mb-2.text-gray-900'); // For inactive listings, this is "text-gray-200"
         const price = element.querySelector('span.fw-bold.fs-5.text-gray-900');
-        const size = element.querySelector('span.fw-bold.fs-6.text-gray-900');
+        const comment = element.querySelector('textarea#listing-comment-input-' + listingId); // e.g. listing-comment-input-35404497
+        
+        const details = Array.from(element.querySelectorAll('.d-flex.flex-column.text-left.me-4'));
+        let size = '';
+        let rooms = '';
+        let balcony_size = '';
+
+        details.forEach(detail => {
+            const label = detail.querySelector('.fs-7.text-gray-400')?.textContent.trim();
+            const value = detail.querySelector('.fs-6.text-gray-900.fw-bold')?.textContent.trim();
+            if (label === 'Alapterület') size = value;
+            else if (label === 'Szobák') rooms = value;
+            else if (label === 'Erkély') balcony_size = value;
+        });
 
         if (address == null) {
             return null;
@@ -37,8 +50,11 @@ function collectListings() {
             listingId,
             address: address.textContent.trim(),
             price: price ? price.textContent.trim() : '',
-            size: size ? size.textContent.trim() : '',
+            size: size,
+            rooms: rooms,
+            balcony_size: balcony_size,
             href: 'https://ingatlan.com/' + listingId,
+            comment: comment ? comment.value.trim() : '',
         };
     }).filter(item => item !== null);
 }
@@ -133,11 +149,14 @@ async function exportGeoJSON() {
                         coordinates: [coords.lon, coords.lat], // GeoJSON order: [lon, lat]
                     },
                     properties: {
-                        listingId: listing.listingId,
-                        address:   listing.address,
-                        price:     listing.price,
-                        size:      listing.size,
-                        href:      listing.href,
+                        listingId:    listing.listingId,
+                        address:      listing.address,
+                        price:        listing.price,
+                        size:         listing.size,
+                        rooms:        listing.rooms,
+                        balcony_size: listing.balcony_size,
+                        comment:      listing.comment,
+                        href:         listing.href,
                     },
                 });
             }
