@@ -187,12 +187,35 @@ async function exportGeoJSON() {
     console.log(`ingatlanMap: exported ${features.length}/${listings.length} listings to GeoJSON`);
 }
 
-function injectExportUI() {
+// Create a Map
+// ------------
+
+const BUDAPEST_CENTER = [47.4979, 19.0402];
+
+let map = null;
+
+function initMap(container) {
+    map = L.map(container).setView(BUDAPEST_CENTER, 12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+}
+
+function injectUI() {
     const firstCard = document.querySelector('.saved-listing-item');
     if (!firstCard) return;
     const listContainer = firstCard.parentElement;
 
+    GM_addStyle(GM_getResourceText('leafletCSS'));
     GM_addStyle(`
+        #fav-map {
+            display: none;
+            height: 500px;
+            margin-bottom: 0.75rem;
+            border-radius: 6px;
+        }
+        #fav-map-toggle,
         #fav-map-export {
             display: inline-block;
             margin-bottom: 0.75rem;
@@ -206,8 +229,25 @@ function injectExportUI() {
             font-weight: 600;
             cursor: pointer;
         }
+        #fav-map-toggle:hover,
         #fav-map-export:hover { background: #f8f9fa; }
     `);
+
+    const mapContainer = document.createElement('div');
+    mapContainer.id = 'fav-map';
+
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'fav-map-toggle';
+    toggleButton.textContent = 'Show map';
+    toggleButton.addEventListener('click', () => {
+        const show = mapContainer.style.display !== 'block';
+        mapContainer.style.display = show ? 'block' : 'none';
+        toggleButton.textContent = show ? 'Hide map' : 'Show map';
+        if (show) {
+            if (!map) initMap(mapContainer);
+            map.invalidateSize(); // the container was hidden when the map was created
+        }
+    });
 
     const exportButton = document.createElement('button');
     exportButton.id = 'fav-map-export';
@@ -220,7 +260,9 @@ function injectExportUI() {
             exportButton.disabled = false;
         });
     });
+    listContainer.parentElement.insertBefore(toggleButton, listContainer);
     listContainer.parentElement.insertBefore(exportButton, listContainer);
+    listContainer.parentElement.insertBefore(mapContainer, listContainer);
 }
 
 // Wait for the Next.js SPA to render listing cards before injecting UI
@@ -237,4 +279,4 @@ function waitForListings(callback, maxWaitMs = 8000) {
     }, 300);
 }
 
-waitForListings(injectExportUI);
+waitForListings(injectUI);
