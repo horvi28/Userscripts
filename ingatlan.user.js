@@ -126,17 +126,10 @@ function drainGeocodeQueue() {
 }
 
 
-// Export to GeoJSON
-// -----------------
+// Geocode listings into GeoJSON features
+// --------------------------------------
 
-async function exportGeoJSON() {
-    const listings = collectListings();
-    if (!listings.length) {
-        console.warn('ingatlanMap: no listings found to export');
-        return;
-    }
-
-    console.log(`ingatlanMap: geocoding ${listings.length} listings for export...`);
+async function geocodeListings(listings) {
     const features = [];
     for (const listing of listings) {
         try {
@@ -164,6 +157,22 @@ async function exportGeoJSON() {
             console.warn('ingatlanMap: geocode failed for', listing.address, e);
         }
     }
+    return features;
+}
+
+
+// Export to GeoJSON
+// -----------------
+
+async function exportGeoJSON() {
+    const listings = collectListings();
+    if (!listings.length) {
+        console.warn('ingatlanMap: no listings found to export');
+        return;
+    }
+
+    console.log(`ingatlanMap: geocoding ${listings.length} listings for export...`);
+    const features = await geocodeListings(listings);
 
     const geojson = JSON.stringify({ type: 'FeatureCollection', features }, null, 2);
     const blob = new Blob([geojson], { type: 'application/geo+json' });
