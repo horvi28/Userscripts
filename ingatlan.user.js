@@ -187,6 +187,21 @@ async function exportGeoJSON() {
     console.log(`ingatlanMap: exported ${features.length}/${listings.length} listings to GeoJSON`);
 }
 
+function createExportButton() {
+    const exportButton = document.createElement('button');
+    exportButton.id = 'fav-map-export';
+    exportButton.textContent = 'Export GeoJSON';
+    exportButton.addEventListener('click', () => {
+        exportButton.textContent = 'Export...';
+        exportButton.disabled = true;
+        exportGeoJSON().finally(() => {
+            exportButton.textContent = 'Export GeoJSON';
+            exportButton.disabled = false;
+        });
+    });
+    return exportButton;
+}
+
 // Create a Map
 // ------------
 
@@ -202,11 +217,7 @@ function initMap(container) {
     }).addTo(map);
 }
 
-function injectUI() {
-    const firstCard = document.querySelector('.saved-listing-item');
-    if (!firstCard) return;
-    const listContainer = firstCard.parentElement;
-
+function injectStyles() {
     GM_addStyle(GM_getResourceText('leafletCSS'));
     GM_addStyle(`
         #fav-map {
@@ -232,10 +243,15 @@ function injectUI() {
         #fav-map-toggle:hover,
         #fav-map-export:hover { background: #f8f9fa; }
     `);
+}
 
+function createMapContainer() {
     const mapContainer = document.createElement('div');
     mapContainer.id = 'fav-map';
+    return mapContainer;
+}
 
+function createToggleButton(mapContainer) {
     const toggleButton = document.createElement('button');
     toggleButton.id = 'fav-map-toggle';
     toggleButton.textContent = 'Show map';
@@ -248,20 +264,19 @@ function injectUI() {
             map.invalidateSize(); // the container was hidden when the map was created
         }
     });
+    return toggleButton;
+}
 
-    const exportButton = document.createElement('button');
-    exportButton.id = 'fav-map-export';
-    exportButton.textContent = 'Export GeoJSON';
-    exportButton.addEventListener('click', () => {
-        exportButton.textContent = 'Export...';
-        exportButton.disabled = true;
-        exportGeoJSON().finally(() => {
-            exportButton.textContent = 'Export GeoJSON';
-            exportButton.disabled = false;
-        });
-    });
-    listContainer.parentElement.insertBefore(toggleButton, listContainer);
-    listContainer.parentElement.insertBefore(exportButton, listContainer);
+function injectUI() {
+    const firstCard = document.querySelector('.saved-listing-item');
+    if (!firstCard) return;
+    const listContainer = firstCard.parentElement;
+
+    injectStyles();
+
+    const mapContainer = createMapContainer();
+    listContainer.parentElement.insertBefore(createToggleButton(mapContainer), listContainer);
+    listContainer.parentElement.insertBefore(createExportButton(), listContainer);
     listContainer.parentElement.insertBefore(mapContainer, listContainer);
 }
 
