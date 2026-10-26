@@ -6,7 +6,7 @@
 // @author       Zsolt Horvath
 // @match        https://ingatlan.com/mentett-hirdeteseim
 // @require      https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
-// @resource     leafletCSS https://unpkg.com/leaflet@1.9.4/dist/leaflet.min.css
+// @resource     leafletCSS https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
@@ -22,12 +22,12 @@
 // ----------------
 
 function collectListings() {
-    const items = document.querySelectorAll('[data-saved-listings-page--item-listing-id-value]');
+    const items = document.querySelectorAll('[data-listing-collections-page--item-listing-id-value]');
     return Array.from(items).map(element => {
-        const listingId = element.getAttribute('data-saved-listings-page--item-listing-id-value');
+        const listingId = element.getAttribute('data-listing-collections-page--item-listing-id-value');
         const address = element.querySelector('span.d-block.fs-7.mb-2.text-gray-900'); // For inactive listings, this is "text-gray-200"
         const price = element.querySelector('span.fw-bold.fs-5.text-gray-900');
-        const comment = element.querySelector('textarea#listing-comment-input-' + listingId); // e.g. listing-comment-input-35404497
+        const comment = element.querySelector('textarea.comment-textarea');
         
         const details = Array.from(element.querySelectorAll('.d-flex.flex-column.text-left.me-4'));
         let size = '';
