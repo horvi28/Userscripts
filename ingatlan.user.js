@@ -255,6 +255,15 @@ function createPopup(properties) {
     return popup;
 }
 
+const MARKER_COLOR = '#e8173c';
+
+function layerStyle(feature) {
+    if (LINE_TYPES.includes(feature.geometry.type)) {
+        return { color: MARKER_COLOR, weight: 8, opacity: 0.85 };
+    }
+    return { color: '#fff', weight: 3, fillColor: MARKER_COLOR, fillOpacity: 0.9 };
+}
+
 let markersLoaded = false;
 
 // Geocodes the listings once and adds a marker for each as it resolves
@@ -262,17 +271,22 @@ async function loadMarkers(onProgress) {
     if (markersLoaded) return;
     markersLoaded = true;
 
+    const listings = collectListings();
+    console.log(`ingatlanMap: adding markers for ${listings.length} listings`);
+
     const bounds = L.latLngBounds([]);
-    await geocodeListings(collectListings(), (done, total, feature) => {
+    await geocodeListings(listings, (done, total, feature) => {
         if (feature) {
             const layer = L.geoJSON(feature, {
-                pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 8 }),
+                pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 12 }),
+                style: layerStyle,
             });
             layer.bindPopup(createPopup(feature.properties)).addTo(map);
             bounds.extend(layer.getBounds());
         }
         onProgress(done, total);
     });
+    console.log(`ingatlanMap: markers done, bounds valid: ${bounds.isValid()}`);
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
 }
 
@@ -323,7 +337,7 @@ function createToggleButton(mapContainer) {
             map.invalidateSize(); // the container was hidden when the map was created
             loadMarkers((done, total) => {
                 toggleButton.textContent = done < total ? `Geocoding ${done}/${total}...` : 'Hide map';
-            });
+            }).catch(e => console.error('ingatlanMap: loading markers failed', e));
         }
     });
     return toggleButton;
