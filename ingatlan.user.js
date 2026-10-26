@@ -129,13 +129,14 @@ function drainGeocodeQueue() {
 // Geocode listings into GeoJSON features
 // --------------------------------------
 
-async function geocodeListings(listings) {
+async function geocodeListings(listings, onProgress = null) {
     const features = [];
-    for (const listing of listings) {
+    for (const [index, listing] of listings.entries()) {
+        let feature = null;
         try {
             const coords = await geocodeAddress(listing.address);
             if (coords) {
-                features.push({
+                feature = {
                     type: 'Feature',
                     geometry: {
                         type: 'Point',
@@ -151,11 +152,13 @@ async function geocodeListings(listings) {
                         comment:      listing.comment,
                         href:         listing.href,
                     },
-                });
+                };
+                features.push(feature);
             }
         } catch (e) {
             console.warn('ingatlanMap: geocode failed for', listing.address, e);
         }
+        if (onProgress) onProgress(index + 1, listings.length, feature);
     }
     return features;
 }
@@ -217,6 +220,52 @@ function initMap(container) {
     }).addTo(map);
 }
 
+function createPopup(properties) {
+    const popup = document.createElement('div');
+
+    const link = document.createElement('a');
+    link.href = properties.href;
+    link.target = '_blank';
+    link.textContent = properties.address;
+    const title = document.createElement('strong');
+    title.appendChild(link);
+    popup.appendChild(title);
+
+    const addLine = (text, tag = 'span') => {
+        const line = document.createElement(tag);
+        line.textContent = text;
+        popup.append(document.createElement('br'), line);
+    };
+
+    const details = [properties.price, properties.size, properties.rooms && properties.rooms + ' room(s)']
+        .filter(Boolean).join(' · ');
+    if (details) addLine(details);
+    if (properties.balcony_size) addLine('Balcony: ' + properties.balcony_size);
+    if (properties.comment) addLine(properties.comment, 'em');
+    return popup;
+}
+
+let markersLoaded = false;
+
+// Geocodes the listings once and adds a marker for each as it resolves
+async function loadMarkers(onProgress) {
+    if (markersLoaded) return;
+    markersLoaded = true;
+
+    const bounds = L.latLngBounds([]);
+    await geocodeListings(collectListings(), (done, total, feature) => {
+        if (feature) {
+            const [lon, lat] = feature.geometry.coordinates;
+            L.circleMarker([lat, lon], { radius: 8 })
+                .bindPopup(createPopup(feature.properties))
+                .addTo(map);
+            bounds.extend([lat, lon]);
+        }
+        onProgress(done, total);
+    });
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
+}
+
 function injectStyles() {
     GM_addStyle(GM_getResourceText('leafletCSS'));
     GM_addStyle(`
@@ -262,6 +311,9 @@ function createToggleButton(mapContainer) {
         if (show) {
             if (!map) initMap(mapContainer);
             map.invalidateSize(); // the container was hidden when the map was created
+            loadMarkers((done, total) => {
+                toggleButton.textContent = done < total ? `Geocoding ${done}/${total}...` : 'Hide map';
+            });
         }
     });
     return toggleButton;
