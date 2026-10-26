@@ -129,6 +129,19 @@ function drainGeocodeQueue() {
 // Geocode listings into GeoJSON features
 // --------------------------------------
 
+const LINE_TYPES = ['LineString', 'MultiLineString'];
+
+// Street-only addresses come back as lines, anything else (including building polygons) is a point
+function featureGeometry(coords) {
+    if (coords.geojson && LINE_TYPES.includes(coords.geojson.type)) {
+        return coords.geojson;
+    }
+    return {
+        type: 'Point',
+        coordinates: [coords.lon, coords.lat], // GeoJSON order: [lon, lat]
+    };
+}
+
 async function geocodeListings(listings, onProgress = null) {
     const features = [];
     for (const [index, listing] of listings.entries()) {
@@ -138,10 +151,7 @@ async function geocodeListings(listings, onProgress = null) {
             if (coords) {
                 feature = {
                     type: 'Feature',
-                    geometry: {
-                        type: 'Point',
-                        coordinates: [coords.lon, coords.lat], // GeoJSON order: [lon, lat]
-                    },
+                    geometry: featureGeometry(coords),
                     properties: {
                         listingId:    listing.listingId,
                         address:      listing.address,
@@ -255,11 +265,11 @@ async function loadMarkers(onProgress) {
     const bounds = L.latLngBounds([]);
     await geocodeListings(collectListings(), (done, total, feature) => {
         if (feature) {
-            const [lon, lat] = feature.geometry.coordinates;
-            L.circleMarker([lat, lon], { radius: 8 })
-                .bindPopup(createPopup(feature.properties))
-                .addTo(map);
-            bounds.extend([lat, lon]);
+            const layer = L.geoJSON(feature, {
+                pointToLayer: (_, latlng) => L.circleMarker(latlng, { radius: 8 }),
+            });
+            layer.bindPopup(createPopup(feature.properties)).addTo(map);
+            bounds.extend(layer.getBounds());
         }
         onProgress(done, total);
     });
